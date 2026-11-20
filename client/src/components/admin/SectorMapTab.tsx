@@ -8,8 +8,27 @@ import {
   RotateCcw,
   Trash2,
 } from 'lucide-react';
-import type { Campaign, DonationPoint, GeoJsonPolygon, Sector } from '../../types';
+import type {
+  Campaign,
+  DonationPoint,
+  GeocodingSuggestion,
+  GeoJsonPolygon,
+  Sector,
+} from '../../types';
+import { AddressAutocomplete } from '../common/AddressAutocomplete';
 import { AdminSectorMap } from '../map/AdminSectorMap';
+
+function estimateZoomFromExtent(extent?: [number, number, number, number]): number {
+  if (!extent) return 13;
+  const spanLng = Math.abs(extent[2] - extent[0]);
+  const spanLat = Math.abs(extent[1] - extent[3]);
+  const span = Math.max(spanLng, spanLat);
+  if (span > 1.0) return 9;
+  if (span > 0.4) return 11;
+  if (span > 0.15) return 12;
+  if (span > 0.05) return 13;
+  return 14;
+}
 
 const PRESET_COLORS = [
   '#2563EB',
@@ -26,6 +45,7 @@ interface SectorMapTabProps {
   campaign: Campaign;
   sectors: Sector[];
   donationPoints: DonationPoint[];
+  onUpdateCampaign: (patch: Partial<Campaign>) => Promise<void>;
   onCreateSector: (geo: GeoJsonPolygon) => Promise<void>;
   onUpdateSector: (
     sectorId: string,
@@ -42,6 +62,7 @@ export function SectorMapTab({
   campaign,
   sectors,
   donationPoints,
+  onUpdateCampaign,
   onCreateSector,
   onUpdateSector,
   onDeleteSector,
@@ -56,6 +77,16 @@ export function SectorMapTab({
 
   const outOfSectorCount = donationPoints.filter((pt) => !pt.sectorId).length;
 
+  const handleCitySelect = async (suggestion: GeocodingSuggestion) => {
+    const zoomLevel = estimateZoomFromExtent(suggestion.extent);
+    await onUpdateCampaign({
+      city: suggestion.label,
+      centerLat: suggestion.lat,
+      centerLng: suggestion.lng,
+      zoomLevel,
+    });
+  };
+
   const handleCopyLink = async (sector: Sector) => {
     const url = `${window.location.origin}/terrain/${sector.accessToken}`;
     try {
@@ -68,42 +99,54 @@ export function SectorMapTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="space-y-0.5">
-          <h2 className="text-sm font-bold text-slate-900">
-            Découpage cartographique des secteurs (Geoman + Turf.js)
-          </h2>
-          <p className="text-xs text-slate-500">
-            Utilisez l’outil Polygone en haut à gauche de la carte pour tracer une zone. Chaque création ou modification réassigne automatiquement les points de collecte.
-          </p>
-        </div>
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-bold text-slate-900">
+              Découpage cartographique des secteurs (Geoman + Turf.js)
+            </h2>
+            <p className="text-xs text-slate-500">
+              Choisissez d’abord la ville / secteur de travail ci-dessous pour centrer la carte, puis tracez vos zones avec l’outil Polygone en haut à gauche de la carte.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {outOfSectorCount > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {outOfSectorCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setOnlyOutOfSector((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                  onlyOutOfSector
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'border border-red-200 bg-red-50 text-red-800 hover:bg-red-100'
+                }`}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {onlyOutOfSector
+                  ? 'Afficher tous les points'
+                  : `Voir ${outOfSectorCount} point(s) hors secteur`}
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => setOnlyOutOfSector((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                onlyOutOfSector
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'border border-red-200 bg-red-50 text-red-800 hover:bg-red-100'
-              }`}
+              onClick={() => void onRecalculate()}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              <AlertTriangle className="h-3.5 w-3.5" />
-              {onlyOutOfSector
-                ? 'Afficher tous les points'
-                : `Voir ${outOfSectorCount} point(s) hors secteur`}
+              <RefreshCw className="h-3.5 w-3.5" />
+              Recalculer Turf.js
             </button>
-          )}
+          </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => void onRecalculate()}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Recalculer Turf.js
-          </button>
+        <div className="max-w-xl">
+          <AddressAutocomplete
+            mode="city"
+            label="Ville / secteur de travail (centre la carte automatiquement)"
+            placeholder="Ex : Sept-Îles, Sherbrooke, Québec, Laval..."
+            selectedLabel={campaign.city}
+            onSelect={(s) => void handleCitySelect(s)}
+          />
         </div>
       </div>
 

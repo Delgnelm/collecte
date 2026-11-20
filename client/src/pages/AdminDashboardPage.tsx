@@ -467,6 +467,7 @@ export function AdminDashboardPage() {
             campaign={data.campaign}
             sectors={data.sectors}
             donationPoints={data.donationPoints}
+            onUpdateCampaign={handleUpdateCampaign}
             onCreateSector={handleCreateSector}
             onUpdateSector={handleUpdateSector}
             onDeleteSector={handleDeleteSector}

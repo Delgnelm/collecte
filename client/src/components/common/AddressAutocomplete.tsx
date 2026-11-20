@@ -205,7 +205,7 @@ export function AddressAutocomplete({
       {isOpen && (
         <ul
           role="listbox"
-          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+          className="absolute z-[1200] mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
         >
           {suggestions.length === 0 ? (
             <li className="px-3.5 py-2.5 text-xs text-slate-500">

@@ -237,6 +237,8 @@ export const api = {
     name: string;
     slug: string;
     city?: string;
+    centerLat?: number;
+    centerLng?: number;
     campaignName?: string;
     adminEmail?: string;
     adminPassword?: string;

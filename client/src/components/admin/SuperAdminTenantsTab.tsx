@@ -12,7 +12,8 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import type { TenantSummary } from '../../types';
+import type { GeocodingSuggestion, TenantSummary } from '../../types';
+import { AddressAutocomplete } from '../common/AddressAutocomplete';
 
 interface SuperAdminTenantsTabProps {
   tenants: TenantSummary[];
@@ -42,7 +43,9 @@ export function SuperAdminTenantsTab({
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
-  const [city, setCity] = useState('Montréal, QC');
+  const [city, setCity] = useState('');
+  const [centerLat, setCenterLat] = useState<number | undefined>(undefined);
+  const [centerLng, setCenterLng] = useState<number | undefined>(undefined);
   const [adminFullName, setAdminFullName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -71,6 +74,8 @@ export function SuperAdminTenantsTab({
         name: name.trim(),
         slug: slug.trim(),
         city: city.trim() || undefined,
+        centerLat,
+        centerLng,
         adminFullName: adminFullName.trim() || undefined,
         adminEmail: adminEmail.trim() || undefined,
         adminPassword: adminPassword || undefined,
@@ -78,7 +83,9 @@ export function SuperAdminTenantsTab({
       setName('');
       setSlug('');
       setSlugEdited(false);
-      setCity('Montréal, QC');
+      setCity('');
+      setCenterLat(undefined);
+      setCenterLng(undefined);
       setAdminFullName('');
       setAdminEmail('');
       setAdminPassword('');
@@ -237,13 +244,21 @@ export function SuperAdminTenantsTab({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-700">Ville initiale</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Québec, QC"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            <AddressAutocomplete
+              mode="city"
+              label="Ville initiale (optionnel)"
+              placeholder="Ex : Sept-Îles, Québec... (Montréal par défaut)"
+              selectedLabel={city}
+              onSelect={(suggestion: GeocodingSuggestion) => {
+                setCity(suggestion.label);
+                setCenterLat(suggestion.lat);
+                setCenterLng(suggestion.lng);
+              }}
+              onClear={() => {
+                setCity('');
+                setCenterLat(undefined);
+                setCenterLng(undefined);
+              }}
             />
           </div>
         </div>
