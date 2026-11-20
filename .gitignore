@@ -8,6 +8,7 @@ dist/
 client/dist/
 server/dist/
 client/dev-dist/
+*.tsbuildinfo
 
 # Environment & Secrets
 .env

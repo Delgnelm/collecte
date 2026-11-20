@@ -178,7 +178,19 @@ function createSmtpTransport(): Transporter | null {
   });
 }
 
-async function dispatchForSectors(sectorIds: string[]): Promise<EmailDispatchResult> {
+function resolveEffectiveBaseUrl(requestBaseUrl?: string): string {
+  const configured = env.APP_BASE_URL;
+  const isLocalConfigured = !configured || configured.includes('localhost') || configured.includes('127.0.0.1');
+  if (isLocalConfigured && requestBaseUrl) {
+    return requestBaseUrl.replace(/\/+$/, '');
+  }
+  return configured || requestBaseUrl?.replace(/\/+$/, '') || 'http://localhost:5173';
+}
+
+async function dispatchForSectors(
+  sectorIds: string[],
+  requestBaseUrl?: string
+): Promise<EmailDispatchResult> {
   const sectors = await prisma.sector.findMany({
     where: { id: { in: sectorIds } },
     include: {
@@ -204,9 +216,10 @@ async function dispatchForSectors(sectorIds: string[]): Promise<EmailDispatchRes
   let simulatedCount = 0;
   let failedCount = 0;
   const notifiedVolunteerIds: string[] = [];
+  const baseUrl = resolveEffectiveBaseUrl(requestBaseUrl);
 
   for (const sector of sectors) {
-    const fieldUrl = `${env.APP_BASE_URL}/terrain/${sector.accessToken}`;
+    const fieldUrl = `${baseUrl}/terrain/${sector.accessToken}`;
 
     for (const volunteer of sector.volunteers) {
       const teammates = sector.volunteers
@@ -298,11 +311,17 @@ async function dispatchForSectors(sectorIds: string[]): Promise<EmailDispatchRes
   };
 }
 
-export async function sendSectorEmails(sectorId: string): Promise<EmailDispatchResult> {
-  return dispatchForSectors([sectorId]);
+export async function sendSectorEmails(
+  sectorId: string,
+  baseUrl?: string
+): Promise<EmailDispatchResult> {
+  return dispatchForSectors([sectorId], baseUrl);
 }
 
-export async function sendCampaignEmails(campaignId: string): Promise<EmailDispatchResult> {
+export async function sendCampaignEmails(
+  campaignId: string,
+  baseUrl?: string
+): Promise<EmailDispatchResult> {
   const sectors = await prisma.sector.findMany({
     where: { campaignId },
     select: { id: true },
@@ -320,5 +339,8 @@ export async function sendCampaignEmails(campaignId: string): Promise<EmailDispa
     };
   }
 
-  return dispatchForSectors(sectors.map((s) => s.id));
+  return dispatchForSectors(
+    sectors.map((s) => s.id),
+    baseUrl
+  );
 }

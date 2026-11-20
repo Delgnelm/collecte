@@ -3,10 +3,11 @@ import { CheckCircle2, HeartHandshake, Loader2, Mail, Phone, StickyNote, User } 
 import { api } from '../../services/api';
 
 interface VolunteerFormProps {
+  tenantSlug?: string;
   onSuccess?: () => void;
 }
 
-export function VolunteerForm({ onSuccess }: VolunteerFormProps) {
+export function VolunteerForm({ tenantSlug, onSuccess }: VolunteerFormProps) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -21,12 +22,15 @@ export function VolunteerForm({ onSuccess }: VolunteerFormProps) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.submitVolunteer({
-        fullName: fullName.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        notes: notes.trim() || undefined,
-      });
+      const res = await api.submitVolunteer(
+        {
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          notes: notes.trim() || undefined,
+        },
+        tenantSlug
+      );
       setConfirmation(res.message);
       setFullName('');
       setEmail('');

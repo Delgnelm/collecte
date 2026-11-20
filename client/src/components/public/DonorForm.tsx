@@ -7,10 +7,11 @@ import { DonorConfirmMap } from '../map/DonorConfirmMap';
 
 interface DonorFormProps {
   bias: { lat: number; lng: number };
+  tenantSlug?: string;
   onSuccess?: () => void;
 }
 
-export function DonorForm({ bias, onSuccess }: DonorFormProps) {
+export function DonorForm({ bias, tenantSlug, onSuccess }: DonorFormProps) {
   const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [donorName, setDonorName] = useState('');
@@ -46,14 +47,17 @@ export function DonorForm({ bias, onSuccess }: DonorFormProps) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.submitDonationPoint({
-        address: selectedAddress,
-        lat: coords.lat,
-        lng: coords.lng,
-        donorName: donorName.trim() || undefined,
-        preferredTimeSlot: preferredTimeSlot.trim() || undefined,
-        instructions: instructions.trim() || undefined,
-      });
+      const res = await api.submitDonationPoint(
+        {
+          address: selectedAddress,
+          lat: coords.lat,
+          lng: coords.lng,
+          donorName: donorName.trim() || undefined,
+          preferredTimeSlot: preferredTimeSlot.trim() || undefined,
+          instructions: instructions.trim() || undefined,
+        },
+        tenantSlug
+      );
 
       setConfirmation({
         message: res.message,

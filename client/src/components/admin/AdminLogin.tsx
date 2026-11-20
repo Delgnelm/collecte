@@ -8,7 +8,7 @@ interface AdminLoginProps {
 }
 
 export function AdminLogin({ onSuccess }: AdminLoginProps) {
-  const [email, setEmail] = useState('admin@ecole.local');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +51,7 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="courriel@domaine.ca"
               className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
           </div>

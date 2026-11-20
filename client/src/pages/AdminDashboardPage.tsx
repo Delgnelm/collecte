@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  Building2,
   ExternalLink,
+  KeyRound,
   Loader2,
   LogOut,
   Map,
@@ -11,27 +13,42 @@ import {
 } from 'lucide-react';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { CampaignSettingsTab } from '../components/admin/CampaignSettingsTab';
+import { ChangePasswordModal } from '../components/admin/ChangePasswordModal';
 import { DonationPointsTab } from '../components/admin/DonationPointsTab';
 import { SectorMapTab } from '../components/admin/SectorMapTab';
+import { SuperAdminTenantsTab } from '../components/admin/SuperAdminTenantsTab';
 import { VolunteersTab } from '../components/admin/VolunteersTab';
 import { Toast, type ToastMessage } from '../components/common/Toast';
-import { ApiError, api, getAdminToken, setAdminToken } from '../services/api';
+import {
+  ApiError,
+  api,
+  getAdminToken,
+  getSelectedTenantId,
+  setAdminToken,
+  setSelectedTenantId,
+} from '../services/api';
 import type {
   AdminCampaignResponse,
+  AuthUser,
   Campaign,
   DonationStatus,
   EmailDispatchResult,
   GeoJsonPolygon,
+  TenantSummary,
 } from '../types';
 
-type AdminTab = 'map' | 'volunteers' | 'points' | 'settings';
+type AdminTab = 'tenants' | 'map' | 'volunteers' | 'points' | 'settings';
 
 export function AdminDashboardPage() {
   const [authenticated, setAuthenticated] = useState<boolean>(Boolean(getAdminToken()));
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [data, setData] = useState<AdminCampaignResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(Boolean(getAdminToken()));
   const [activeTab, setActiveTab] = useState<AdminTab>('map');
+  const [initialTabSet, setInitialTabSet] = useState(false);
   const [lastDispatch, setLastDispatch] = useState<EmailDispatchResult | null>(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const notify = useCallback((type: ToastMessage['type'], text: string) => {
@@ -53,8 +70,37 @@ export function AdminDashboardPage() {
 
     setLoading(true);
     try {
-      const res = await api.getAdminCampaign();
-      setData(res);
+      const me = await api.getAdminMe();
+      setAuthUser(me.user);
+
+      if (me.user.role === 'SUPERADMIN') {
+        const currentSelected = getSelectedTenantId();
+        const stillExists =
+          currentSelected && me.tenants.some((t) => t.id === currentSelected);
+        if (!stillExists && me.tenants.length > 0) {
+          setSelectedTenantId(me.tenants[0].id);
+        }
+        const [campaignRes, tenantsRes] = await Promise.all([
+          api.getAdminCampaign(),
+          api.getTenants(),
+        ]);
+        setData(campaignRes);
+        setTenants(tenantsRes.tenants);
+        if (!initialTabSet) {
+          setActiveTab('tenants');
+          setInitialTabSet(true);
+        }
+      } else {
+        setSelectedTenantId(null);
+        const campaignRes = await api.getAdminCampaign();
+        setData(campaignRes);
+        setTenants([]);
+        if (!initialTabSet) {
+          setActiveTab('map');
+          setInitialTabSet(true);
+        }
+      }
+
       setAuthenticated(true);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -65,7 +111,7 @@ export function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [notify]);
+  }, [notify, initialTabSet]);
 
   useEffect(() => {
     if (authenticated) {
@@ -75,8 +121,21 @@ export function AdminDashboardPage() {
 
   const handleLogout = () => {
     setAdminToken(null);
+    setSelectedTenantId(null);
     setAuthenticated(false);
+    setAuthUser(null);
     setData(null);
+    setTenants([]);
+    setInitialTabSet(false);
+  };
+
+  const handleSwitchTenant = async (tenantId: string, goToMap = false) => {
+    setSelectedTenantId(tenantId);
+    setLastDispatch(null);
+    if (goToMap) {
+      setActiveTab('map');
+    }
+    await loadDashboard();
   };
 
   if (!authenticated) {
@@ -94,7 +153,7 @@ export function AdminDashboardPage() {
     );
   }
 
-  if (!data) {
+  if (!data || !authUser) {
     return null;
   }
 
@@ -262,7 +321,18 @@ export function AdminDashboardPage() {
     }
   };
 
+  const isSuperAdmin = authUser.role === 'SUPERADMIN';
   const tabs: Array<{ id: AdminTab; label: string; icon: typeof Map; badge?: number }> = [
+    ...(isSuperAdmin
+      ? [
+          {
+            id: 'tenants' as const,
+            label: 'Tenants (SuperAdmin)',
+            icon: Building2,
+            badge: tenants.length,
+          },
+        ]
+      : []),
     { id: 'map', label: 'Carte & Secteurs', icon: Map, badge: data.sectors.length },
     {
       id: 'volunteers',
@@ -284,22 +354,52 @@ export function AdminDashboardPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
-              Tableau de bord organisateur
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+                {isSuperAdmin ? 'Console SuperAdmin' : 'Administration Tenant'}
+              </p>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                {data.tenant.name}
+              </span>
+            </div>
             <h1 className="text-lg font-extrabold text-slate-900 sm:text-xl">
               {data.campaign.name}
             </h1>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {isSuperAdmin && tenants.length > 0 && (
+              <select
+                aria-label="Tenant actif"
+                value={data.tenant.id}
+                onChange={(e) => void handleSwitchTenant(e.target.value)}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-950"
+              >
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} {t.isActive ? '' : '(Inactif)'}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <Link
-              to="/"
+              to={`/t/${data.tenant.slug}`}
               target="_blank"
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               Portail public <ExternalLink className="h-3.5 w-3.5" />
             </Link>
+
+            <button
+              type="button"
+              onClick={() => setPasswordModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              Mot de passe
+            </button>
+
             <button
               type="button"
               onClick={handleLogout}
@@ -344,6 +444,16 @@ export function AdminDashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
+        {activeTab === 'tenants' && isSuperAdmin && (
+          <SuperAdminTenantsTab
+            tenants={tenants}
+            activeTenantId={data.tenant.id}
+            onSelectTenant={(id) => void handleSwitchTenant(id, true)}
+            onRefresh={loadDashboard}
+            onNotify={notify}
+          />
+        )}
+
         {activeTab === 'map' && (
           <SectorMapTab
             campaign={data.campaign}
@@ -389,6 +499,12 @@ export function AdminDashboardPage() {
           />
         )}
       </main>
+
+      <ChangePasswordModal
+        isOpen={passwordModalOpen}
+        onClose={() => setPasswordModalOpen(false)}
+        onSuccess={(msg) => notify('success', msg)}
+      />
 
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>

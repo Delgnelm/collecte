@@ -8,6 +8,7 @@ import { fieldRouter } from './routes/field.js';
 import { geocodeRouter } from './routes/geocode.js';
 import { healthRouter } from './routes/health.js';
 import { publicRouter } from './routes/public.js';
+import { superadminRouter } from './routes/superadmin.js';
 
 export function createApp() {
   const app = express();
@@ -44,6 +45,7 @@ export function createApp() {
   app.use('/api/public', publicRouter);
   app.use('/api/field', fieldRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/superadmin', superadminRouter);
 
   app.use('/api/*', (_req, res) => {
     res.status(404).json({ error: 'Endpoint API introuvable.' });

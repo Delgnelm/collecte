@@ -7,14 +7,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  SUPERADMIN
+  TENANT_ADMIN
+}
+
 enum DonationStatus {
   PENDING
   COLLECTED
   ABSENT
 }
 
+model Tenant {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  users     User[]
+  campaigns Campaign[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         UserRole @default(TENANT_ADMIN)
+  tenantId     String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
 model Campaign {
   id                  String          @id @default(cuid())
+  tenantId            String
   name                String
   city                String
   centerLat           Float
@@ -26,9 +60,12 @@ model Campaign {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
+  tenant              Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sectors             Sector[]
   volunteers          Volunteer[]
   donationPoints      DonationPoint[]
+
+  @@index([tenantId])
 }
 
 model Sector {

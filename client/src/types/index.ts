@@ -1,4 +1,5 @@
 export type DonationStatus = 'PENDING' | 'COLLECTED' | 'ABSENT';
+export type UserRole = 'SUPERADMIN' | 'TENANT_ADMIN';
 
 export interface GeoJsonPolygon {
   type: 'Polygon';
@@ -18,8 +19,61 @@ export interface GeocodingSuggestion {
   extent?: [number, number, number, number];
 }
 
+export interface TenantInfo {
+  id: string;
+  name: string;
+  slug: string;
+  isActive?: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  tenantId: string | null;
+  tenantName: string | null;
+  tenantSlug: string | null;
+}
+
+export interface TenantAdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  tenantId?: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface TenantSummary {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  users: TenantAdminUser[];
+  campaign: {
+    id: string;
+    name: string;
+    city: string;
+    isDonorFormOpen: boolean;
+    isVolunteerFormOpen: boolean;
+    lastPurgedAt: string | null;
+  } | null;
+  stats: {
+    usersCount: number;
+    sectorsCount: number;
+    volunteersCount: number;
+    donationPointsCount: number;
+    collectedPointsCount: number;
+  };
+}
+
 export interface Campaign {
   id: string;
+  tenantId?: string;
   name: string;
   city: string;
   centerLat: number;
@@ -33,6 +87,7 @@ export interface Campaign {
 }
 
 export interface PublicCampaignResponse {
+  tenant: TenantInfo;
   campaign: Omit<Campaign, 'lastPurgedAt'>;
   stats: {
     totalPoints: number;
@@ -106,7 +161,13 @@ export interface AdminStats {
   anonymizedPointsCount: number;
 }
 
+export interface AdminMeResponse {
+  user: AuthUser;
+  tenants: TenantInfo[];
+}
+
 export interface AdminCampaignResponse {
+  tenant: TenantInfo;
   campaign: Campaign;
   sectors: Sector[];
   volunteers: Volunteer[];

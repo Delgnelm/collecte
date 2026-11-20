@@ -8,6 +8,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<PublicPortalPage />} />
+        <Route path="/t/:slug" element={<PublicPortalPage />} />
         <Route path="/admin" element={<AdminDashboardPage />} />
         <Route path="/terrain/:accessToken" element={<FieldTeamPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

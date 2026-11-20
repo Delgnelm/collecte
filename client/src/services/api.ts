@@ -1,5 +1,7 @@
 import type {
   AdminCampaignResponse,
+  AdminMeResponse,
+  AuthUser,
   Campaign,
   DonationPoint,
   DonationStatus,
@@ -11,10 +13,14 @@ import type {
   PurgeResult,
   RecalculationSummary,
   Sector,
+  TenantAdminUser,
+  TenantInfo,
+  TenantSummary,
   Volunteer,
 } from '../types';
 
 const TOKEN_STORAGE_KEY = 'collecte_admin_token';
+const SELECTED_TENANT_KEY = 'collecte_selected_tenant_id';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -48,7 +54,27 @@ export function setAdminToken(token: string | null): void {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
     }
   } catch {
-    // Ignore storage quota errors
+    // Ignore storage errors
+  }
+}
+
+export function getSelectedTenantId(): string | null {
+  try {
+    return localStorage.getItem(SELECTED_TENANT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSelectedTenantId(tenantId: string | null): void {
+  try {
+    if (tenantId) {
+      localStorage.setItem(SELECTED_TENANT_KEY, tenantId);
+    } else {
+      localStorage.removeItem(SELECTED_TENANT_KEY);
+    }
+  } catch {
+    // Ignore storage errors
   }
 }
 
@@ -67,6 +93,10 @@ async function request<T>(
     const token = getAdminToken();
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
+    }
+    const selectedTenant = getSelectedTenantId();
+    if (selectedTenant) {
+      headers.set('X-Tenant-Id', selectedTenant);
     }
   }
 
@@ -91,39 +121,54 @@ async function request<T>(
 
 export const api = {
   // Public
-  getPublicCampaign() {
-    return request<PublicCampaignResponse>('/api/public/campaign');
+  getPublicCampaign(tenantSlug?: string) {
+    const path = tenantSlug
+      ? `/api/public/tenants/${encodeURIComponent(tenantSlug)}/campaign`
+      : '/api/public/campaign';
+    return request<PublicCampaignResponse>(path);
   },
 
-  submitDonationPoint(data: {
-    address: string;
-    lat: number;
-    lng: number;
-    donorName?: string;
-    instructions?: string;
-    preferredTimeSlot?: string;
-  }) {
+  submitDonationPoint(
+    data: {
+      address: string;
+      lat: number;
+      lng: number;
+      donorName?: string;
+      instructions?: string;
+      preferredTimeSlot?: string;
+    },
+    tenantSlug?: string
+  ) {
+    const path = tenantSlug
+      ? `/api/public/tenants/${encodeURIComponent(tenantSlug)}/donation-points`
+      : '/api/public/donation-points';
     return request<{
       point: DonationPoint;
       inSector: boolean;
       sectorName: string | null;
       message: string;
-    }>('/api/public/donation-points', {
+    }>(path, {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  submitVolunteer(data: {
-    fullName: string;
-    email: string;
-    phone: string;
-    notes?: string;
-  }) {
+  submitVolunteer(
+    data: {
+      fullName: string;
+      email: string;
+      phone: string;
+      notes?: string;
+    },
+    tenantSlug?: string
+  ) {
+    const path = tenantSlug
+      ? `/api/public/tenants/${encodeURIComponent(tenantSlug)}/volunteers`
+      : '/api/public/volunteers';
     return request<{
       volunteer: { id: string; fullName: string };
       message: string;
-    }>('/api/public/volunteers', {
+    }>(path, {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -163,14 +208,110 @@ export const api = {
     );
   },
 
-  // Admin
+  // Admin Auth & Profile
   adminLogin(email: string, password: string) {
-    return request<{ token: string; admin: { email: string } }>('/api/admin/login', {
+    return request<{ token: string; user: AuthUser }>('/api/admin/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   },
 
+  getAdminMe() {
+    return request<AdminMeResponse>('/api/admin/me', { auth: true });
+  },
+
+  changePassword(currentPassword: string, newPassword: string) {
+    return request<{ message: string }>('/api/admin/change-password', {
+      method: 'POST',
+      auth: true,
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  },
+
+  // SuperAdmin Tenants
+  getTenants() {
+    return request<{ tenants: TenantSummary[] }>('/api/superadmin/tenants', { auth: true });
+  },
+
+  createTenant(data: {
+    name: string;
+    slug: string;
+    city?: string;
+    campaignName?: string;
+    adminEmail?: string;
+    adminPassword?: string;
+    adminFullName?: string;
+  }) {
+    return request<{ tenant: TenantInfo; campaign: Campaign; adminUser: TenantAdminUser | null }>(
+      '/api/superadmin/tenants',
+      {
+        method: 'POST',
+        auth: true,
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  updateTenant(tenantId: string, data: { name?: string; slug?: string; isActive?: boolean }) {
+    return request<{ tenant: TenantInfo }>(
+      `/api/superadmin/tenants/${encodeURIComponent(tenantId)}`,
+      {
+        method: 'PATCH',
+        auth: true,
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  deleteTenant(tenantId: string) {
+    return request<{ deletedId: string }>(
+      `/api/superadmin/tenants/${encodeURIComponent(tenantId)}`,
+      {
+        method: 'DELETE',
+        auth: true,
+      }
+    );
+  },
+
+  createTenantUser(
+    tenantId: string,
+    data: { fullName: string; email: string; password: string }
+  ) {
+    return request<{ user: TenantAdminUser }>(
+      `/api/superadmin/tenants/${encodeURIComponent(tenantId)}/users`,
+      {
+        method: 'POST',
+        auth: true,
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  updateTenantUser(
+    userId: string,
+    data: { fullName?: string; isActive?: boolean; password?: string }
+  ) {
+    return request<{ user: TenantAdminUser }>(
+      `/api/superadmin/users/${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        auth: true,
+        body: JSON.stringify(data),
+      }
+    );
+  },
+
+  deleteTenantUser(userId: string) {
+    return request<{ deletedId: string }>(
+      `/api/superadmin/users/${encodeURIComponent(userId)}`,
+      {
+        method: 'DELETE',
+        auth: true,
+      }
+    );
+  },
+
+  // Tenant Admin Campaign
   getAdminCampaign() {
     return request<AdminCampaignResponse>('/api/admin/campaign', { auth: true });
   },

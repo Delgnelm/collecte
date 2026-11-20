@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Gift,
   GraduationCap,
@@ -16,14 +16,16 @@ import { api } from '../services/api';
 import type { PublicCampaignResponse } from '../types';
 
 export function PublicPortalPage() {
+  const { slug } = useParams<{ slug?: string }>();
   const [data, setData] = useState<PublicCampaignResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'donor' | 'volunteer'>('donor');
 
   const fetchCampaign = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await api.getPublicCampaign();
+      const res = await api.getPublicCampaign(slug);
       setData(res);
       setError(null);
       if (!res.campaign.isDonorFormOpen && res.campaign.isVolunteerFormOpen) {
@@ -36,7 +38,7 @@ export function PublicPortalPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [slug]);
 
   useEffect(() => {
     void fetchCampaign();
@@ -57,7 +59,7 @@ export function PublicPortalPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-lg font-bold text-slate-900">Service temporairement indisponible</h1>
+          <h1 className="text-lg font-bold text-slate-900">Campagne introuvable</h1>
           <p className="mt-2 text-sm text-slate-600">{error || 'Réessayez dans un instant.'}</p>
           <button
             type="button"
@@ -71,7 +73,7 @@ export function PublicPortalPage() {
     );
   }
 
-  const { campaign, stats } = data;
+  const { tenant, campaign, stats } = data;
   const bothClosed = !campaign.isDonorFormOpen && !campaign.isVolunteerFormOpen;
   const bothOpen = campaign.isDonorFormOpen && campaign.isVolunteerFormOpen;
 
@@ -81,7 +83,7 @@ export function PublicPortalPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-blue-100 backdrop-blur">
             <GraduationCap className="h-4 w-4 text-emerald-300" />
-            Collecte Porte-à-Porte
+            {tenant.name}
           </div>
           <div className="inline-flex items-center gap-1.5 text-xs text-blue-100">
             <MapPin className="h-3.5 w-3.5 text-emerald-300" />
@@ -178,12 +180,13 @@ export function PublicPortalPage() {
               {activeTab === 'donor' && campaign.isDonorFormOpen && (
                 <DonorForm
                   bias={{ lat: campaign.centerLat, lng: campaign.centerLng }}
+                  tenantSlug={tenant.slug}
                   onSuccess={() => void fetchCampaign()}
                 />
               )}
 
               {activeTab === 'volunteer' && campaign.isVolunteerFormOpen && (
-                <VolunteerForm onSuccess={() => void fetchCampaign()} />
+                <VolunteerForm tenantSlug={tenant.slug} onSuccess={() => void fetchCampaign()} />
               )}
             </>
           )}

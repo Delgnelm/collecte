@@ -1,28 +1,12 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { bootstrapPlatform } from '../src/lib/campaign.js';
+import { prisma } from '../src/lib/prisma.js';
 
 async function main() {
-  const existing = await prisma.campaign.findFirst();
-  if (existing) {
-    console.log(`Campagne déjà existante : "${existing.name}" (${existing.id})`);
-    return;
-  }
-
-  const campaign = await prisma.campaign.create({
-    data: {
-      name: 'Grande Collecte Annuelle — École Saint-Laurent',
-      city: 'Montréal, QC',
-      centerLat: 45.5017,
-      centerLng: -73.5673,
-      zoomLevel: 13,
-      isDonorFormOpen: true,
-      isVolunteerFormOpen: true,
-    },
-  });
-
-  console.log(`Campagne initiale créée : "${campaign.name}" (${campaign.id})`);
+  const { tenant, campaign } = await bootstrapPlatform();
+  console.log(
+    `Plateforme initialisée — Tenant: "${tenant.name}" (${tenant.slug}) | Campagne: "${campaign.name}" (${campaign.id})`
+  );
 }
 
 main()

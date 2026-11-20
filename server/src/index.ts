@@ -1,12 +1,12 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
-import { ensureDefaultCampaign } from './lib/campaign.js';
+import { bootstrapPlatform } from './lib/campaign.js';
 import { prisma } from './lib/prisma.js';
 
 async function start() {
   try {
     await prisma.$connect();
-    await ensureDefaultCampaign();
+    await bootstrapPlatform();
 
     const app = createApp();
     const server = app.listen(env.PORT, () => {

@@ -1,3 +1,5 @@
+name: collecte
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,11 +11,16 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-collecte_ecole}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - collecte_internal
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collecte} -d ${POSTGRES_DB:-collecte_ecole}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-collecte} -d $${POSTGRES_DB:-collecte_ecole}"]
+      interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
   server:
     build:
@@ -28,12 +35,12 @@ services:
       NODE_ENV: production
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-collecte}:${POSTGRES_PASSWORD:-collecte_secret}@postgres:5432/${POSTGRES_DB:-collecte_ecole}?schema=public
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
-      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-at-least-32-chars}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ecole.local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe2026!}
-      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET est requis dans .env}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-denis.safieddine@gmail.com}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:?SUPERADMIN_PASSWORD est requis dans .env}
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Denis Safieddine}
       GEOCODING_PROVIDER: ${GEOCODING_PROVIDER:-photon}
       PHOTON_BASE_URL: ${PHOTON_BASE_URL:-https://photon.komoot.io}
       MAPBOX_ACCESS_TOKEN: ${MAPBOX_ACCESS_TOKEN:-}
@@ -46,13 +53,16 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Collecte École}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-collecte@ecole.local}
       SMTP_DRY_RUN: ${SMTP_DRY_RUN:-true}
-    ports:
-      - "4000:4000"
+    networks:
+      - collecte_internal
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/health || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/health || exit 1"]
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   client:
     build:
@@ -64,7 +74,16 @@ services:
       server:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "${APP_PORT:-3040}:80"
+    networks:
+      - collecte_internal
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  collecte_internal:
+    name: collecte_internal
+    driver: bridge
 
 volumes:
   postgres_data:

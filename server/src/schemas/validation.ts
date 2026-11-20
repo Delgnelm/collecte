@@ -130,3 +130,50 @@ export const purgePiiSchema = z.object({
 });
 
 export const uuidParamSchema = z.string().uuid('Jeton d’accès terrain invalide');
+
+export const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(2, 'Le slug doit contenir au moins 2 caractères')
+  .max(60, 'Le slug ne peut pas dépasser 60 caractères')
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Le slug ne peut contenir que des lettres minuscules, chiffres et tirets');
+
+export const createTenantSchema = z.object({
+  name: z.string().trim().min(2, 'Nom de l’organisation requis').max(120),
+  slug: slugSchema,
+  city: z.string().trim().min(2).max(140).optional(),
+  campaignName: z.string().trim().min(2).max(140).optional(),
+  centerLat: z.number().finite().min(-90).max(90).optional(),
+  centerLng: z.number().finite().min(-180).max(180).optional(),
+  adminEmail: z.string().trim().email('Courriel administrateur invalide').max(160).optional(),
+  adminPassword: z
+    .string()
+    .min(8, 'Le mot de passe doit contenir au moins 8 caractères')
+    .max(120)
+    .optional(),
+  adminFullName: z.string().trim().min(2).max(120).optional(),
+});
+
+export const updateTenantSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  slug: slugSchema.optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const createTenantUserSchema = z.object({
+  fullName: z.string().trim().min(2, 'Nom complet requis').max(120),
+  email: z.string().trim().email('Adresse courriel invalide').max(160),
+  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').max(120),
+});
+
+export const updateTenantUserSchema = z.object({
+  fullName: z.string().trim().min(2).max(120).optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères').max(120).optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Mot de passe actuel requis'),
+  newPassword: z.string().min(8, 'Le nouveau mot de passe doit contenir au moins 8 caractères').max(120),
+});

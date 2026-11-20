@@ -29,7 +29,12 @@ function parseProvider(value: string | undefined): GeocodingProviderName {
 const nodeEnv = process.env.NODE_ENV || 'development';
 const jwtSecret = process.env.JWT_SECRET || 'dev-insecure-secret-change-me-in-production-32chars';
 
-if (nodeEnv === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.startsWith('change-me'))) {
+if (
+  nodeEnv === 'production' &&
+  (!process.env.JWT_SECRET ||
+    process.env.JWT_SECRET.length < 32 ||
+    process.env.JWT_SECRET.startsWith('change-me'))
+) {
   throw new Error(
     'CONFIGURATION INVALIDE : JWT_SECRET doit être défini avec au moins 32 caractères aléatoires en production.'
   );
@@ -40,11 +45,18 @@ export const env = {
   PORT: Number(process.env.PORT || 4000),
   DATABASE_URL: process.env.DATABASE_URL || 'file:./dev.db',
   APP_BASE_URL: (process.env.APP_BASE_URL || 'http://localhost:5173').replace(/\/+$/, ''),
-  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
   JWT_SECRET: jwtSecret,
-  ADMIN_EMAIL: (process.env.ADMIN_EMAIL || 'admin@ecole.local').trim().toLowerCase(),
-  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'ChangeMe2026!',
-  ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH?.trim() || '',
+  SUPERADMIN_EMAIL: (
+    process.env.SUPERADMIN_EMAIL ||
+    process.env.ADMIN_EMAIL ||
+    'denis.safieddine@gmail.com'
+  )
+    .trim()
+    .toLowerCase(),
+  SUPERADMIN_PASSWORD:
+    process.env.SUPERADMIN_PASSWORD || process.env.ADMIN_PASSWORD || 'ChangeMe2026!',
+  SUPERADMIN_NAME: (process.env.SUPERADMIN_NAME || 'Denis Safieddine').trim(),
   GEOCODING_PROVIDER: parseProvider(process.env.GEOCODING_PROVIDER),
   PHOTON_BASE_URL: (process.env.PHOTON_BASE_URL || 'https://photon.komoot.io').replace(/\/+$/, ''),
   MAPBOX_ACCESS_TOKEN: process.env.MAPBOX_ACCESS_TOKEN?.trim() || '',
