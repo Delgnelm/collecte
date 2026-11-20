@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DonationStatus {
+  PENDING
+  COLLECTED
+  ABSENT
+}
+
+model Campaign {
+  id                  String          @id @default(cuid())
+  name                String
+  city                String
+  centerLat           Float
+  centerLng           Float
+  zoomLevel           Int             @default(13)
+  isDonorFormOpen     Boolean         @default(true)
+  isVolunteerFormOpen Boolean         @default(true)
+  lastPurgedAt        DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  sectors             Sector[]
+  volunteers          Volunteer[]
+  donationPoints      DonationPoint[]
+}
+
+model Sector {
+  id             String          @id @default(cuid())
+  campaignId     String
+  name           String
+  color          String
+  geoJsonPolygon Json
+  accessToken    String          @unique @default(uuid())
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  campaign       Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  volunteers     Volunteer[]
+  donationPoints DonationPoint[]
+
+  @@index([campaignId])
+}
+
+model Volunteer {
+  id             String    @id @default(cuid())
+  campaignId     String
+  sectorId       String?
+  fullName       String
+  email          String
+  phone          String
+  notes          String?
+  isAnonymized   Boolean   @default(false)
+  lastNotifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  campaign       Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sector         Sector?   @relation(fields: [sectorId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([sectorId])
+}
+
+model DonationPoint {
+  id                String         @id @default(cuid())
+  campaignId        String
+  sectorId          String?
+  address           String
+  lat               Float
+  lng               Float
+  donorName         String?
+  instructions      String?
+  preferredTimeSlot String?
+  status            DonationStatus @default(PENDING)
+  isAnonymized      Boolean        @default(false)
+  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime       @default(now())
+
+  campaign          Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sector            Sector?        @relation(fields: [sectorId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([sectorId])
+  @@index([status])
+}

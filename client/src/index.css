@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+}
+
+.leaflet-container {
+  font-family: inherit;
+  z-index: 1;
+}
+
+.leaflet-pm-toolbar .leaflet-buttons-control-button {
+  background-color: #ffffff;
+}
+
+@keyframes gps-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 14px rgba(37, 99, 235, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+.gps-pulse-dot {
+  animation: gps-pulse 2s infinite;
+}
