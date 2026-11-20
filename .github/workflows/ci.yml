@@ -1,0 +1,94 @@
+name: CI — Collecte École PWA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Backend (Prisma, TypeScript & Tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma SQLite schema
+        env:
+          DATABASE_URL: file:./dev.db
+        run: npx prisma validate --schema=prisma/schema.prisma
+
+      - name: Validate Prisma PostgreSQL schema
+        env:
+          DATABASE_URL: postgresql://collecte:collecte_secret@localhost:5432/collecte_ecole?schema=public
+        run: npx prisma validate --schema=prisma/schema.postgresql.prisma
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: file:./dev.db
+        run: npx prisma generate
+
+      - name: TypeScript build
+        run: npm run build
+
+      - name: Run integration tests
+        run: npm test
+
+  client:
+    name: Frontend PWA (TypeScript & Vite Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and build PWA
+        run: npm run build
+
+      - name: Verify PWA output artifacts
+        run: test -f dist/sw.js && test -f dist/manifest.webmanifest
+
+  docker:
+    name: Docker Compose Build
+    runs-on: ubuntu-latest
+    needs: [server, client]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config -q
+
+      - name: Build production images
+        run: docker compose build
