@@ -386,9 +386,17 @@ export function AdminDashboardPage() {
             <Link
               to={`/t/${data.tenant.slug}`}
               target="_blank"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100"
             >
-              Portail public <ExternalLink className="h-3.5 w-3.5" />
+              Lien Donateurs <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+
+            <Link
+              to={`/t/${data.tenant.slug}/benevole`}
+              target="_blank"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              Lien Bénévoles <ExternalLink className="h-3.5 w-3.5" />
             </Link>
 
             <button
@@ -492,10 +500,12 @@ export function AdminDashboardPage() {
 
         {activeTab === 'settings' && (
           <CampaignSettingsTab
+            tenantSlug={data.tenant.slug}
             campaign={data.campaign}
             stats={data.stats}
             onUpdateCampaign={handleUpdateCampaign}
             onPurgePii={handlePurgePii}
+            onNotify={notify}
           />
         )}
       </main>

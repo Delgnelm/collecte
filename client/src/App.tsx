@@ -7,11 +7,13 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PublicPortalPage />} />
-        <Route path="/t/:slug" element={<PublicPortalPage />} />
+        <Route path="/" element={<Navigate to="/admin" replace />} />
         <Route path="/admin" element={<AdminDashboardPage />} />
+        <Route path="/t/:slug" element={<PublicPortalPage mode="donor" />} />
+        <Route path="/t/:slug/benevole" element={<PublicPortalPage mode="volunteer" />} />
+        <Route path="/t/:slug/benevoles" element={<PublicPortalPage mode="volunteer" />} />
         <Route path="/terrain/:accessToken" element={<FieldTeamPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </BrowserRouter>
   );

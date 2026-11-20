@@ -177,13 +177,13 @@ export function SuperAdminTenantsTab({
     }
   };
 
-  const handleCopyPublicUrl = async (slugValue: string) => {
-    const url = `${window.location.origin}/t/${slugValue}`;
+  const handleCopyUrl = async (path: string, label: string) => {
+    const url = `${window.location.origin}${path}`;
     try {
       await navigator.clipboard.writeText(url);
-      onNotify('success', `URL publique copiée : ${url}`);
+      onNotify('success', `${label} copié : ${url}`);
     } catch {
-      onNotify('info', `URL publique : ${url}`);
+      onNotify('info', `${label} : ${url}`);
     }
   };
 
@@ -332,28 +332,61 @@ export function SuperAdminTenantsTab({
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 font-mono text-xs text-slate-500">
-                    Portail public : /t/{tenant.slug}
-                  </p>
+                  <p className="mt-1 font-mono text-xs text-slate-500">slug : {tenant.slug}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-1.5 rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-mono text-slate-700">
+                    <strong className="font-sans text-blue-900">Donateurs :</strong> /t/{tenant.slug}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyUrl(`/t/${tenant.slug}`, 'Lien donateurs')}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copier
+                    </button>
+                    <a
+                      href={`/t/${tenant.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-md border border-slate-200 bg-white p-1 text-slate-700 hover:bg-slate-100"
+                      title="Ouvrir le formulaire donateurs"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyPublicUrl(tenant.slug)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Lien
-                  </button>
-                  <a
-                    href={`/t/${tenant.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-mono text-slate-700">
+                    <strong className="font-sans text-emerald-800">Bénévoles :</strong> /t/{tenant.slug}/benevole
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleCopyUrl(`/t/${tenant.slug}/benevole`, 'Lien bénévoles')
+                      }
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copier
+                    </button>
+                    <a
+                      href={`/t/${tenant.slug}/benevole`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center rounded-md border border-slate-200 bg-white p-1 text-slate-700 hover:bg-slate-100"
+                      title="Ouvrir le formulaire bénévoles"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
                 </div>
               </div>
 

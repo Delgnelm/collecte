@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, LockKeyhole, Shield } from 'lucide-react';
+import { Loader2, LockKeyhole, Shield } from 'lucide-react';
 import { api, setAdminToken } from '../../services/api';
 
 interface AdminLoginProps {
@@ -85,16 +84,6 @@ export function AdminLogin({ onSuccess }: AdminLoginProps) {
             Se connecter
           </button>
         </form>
-
-        <div className="mt-6 text-center">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-900"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour au portail public
-          </Link>
-        </div>
       </div>
     </div>
   );

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import {
   BarChart3,
   CheckCircle2,
+  Copy,
+  ExternalLink,
   Loader2,
   MapPin,
   Save,
@@ -14,10 +16,12 @@ import { AddressAutocomplete } from '../common/AddressAutocomplete';
 import { PurgeDataModal } from './PurgeDataModal';
 
 interface CampaignSettingsTabProps {
+  tenantSlug: string;
   campaign: Campaign;
   stats: AdminStats;
   onUpdateCampaign: (patch: Partial<Campaign>) => Promise<void>;
   onPurgePii: () => Promise<void>;
+  onNotify: (type: 'success' | 'error' | 'info', text: string) => void;
 }
 
 function estimateZoomFromExtent(extent?: [number, number, number, number]): number {
@@ -33,11 +37,22 @@ function estimateZoomFromExtent(extent?: [number, number, number, number]): numb
 }
 
 export function CampaignSettingsTab({
+  tenantSlug,
   campaign,
   stats,
   onUpdateCampaign,
   onPurgePii,
+  onNotify,
 }: CampaignSettingsTabProps) {
+  const copyLink = async (path: string, label: string) => {
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      onNotify('success', `${label} copié : ${url}`);
+    } catch {
+      onNotify('info', `${label} : ${url}`);
+    }
+  };
   const [name, setName] = useState(campaign.name);
   const [city, setCity] = useState(campaign.city);
   const [centerLat, setCenterLat] = useState(campaign.centerLat);
@@ -193,72 +208,120 @@ export function CampaignSettingsTab({
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Formulaire d’inscription des Donateurs
-                </p>
-                <p className="text-xs text-slate-500">
-                  Permet aux citoyens de déclarer leur adresse de cueillette.
-                </p>
+            <div className="rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Formulaire d’inscription des Donateurs
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Permet aux citoyens de déclarer leur adresse de cueillette.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void onUpdateCampaign({ isDonorFormOpen: !campaign.isDonorFormOpen })
+                  }
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                    campaign.isDonorFormOpen
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {campaign.isDonorFormOpen ? (
+                    <>
+                      <ToggleRight className="h-5 w-5 text-emerald-600" />
+                      Ouvert
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="h-5 w-5 text-slate-500" />
+                      Fermé
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  void onUpdateCampaign({ isDonorFormOpen: !campaign.isDonorFormOpen })
-                }
-                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                  campaign.isDonorFormOpen
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-slate-200 text-slate-700'
-                }`}
-              >
-                {campaign.isDonorFormOpen ? (
-                  <>
-                    <ToggleRight className="h-5 w-5 text-emerald-600" />
-                    Ouvert
-                  </>
-                ) : (
-                  <>
-                    <ToggleLeft className="h-5 w-5 text-slate-500" />
-                    Fermé
-                  </>
-                )}
-              </button>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                <span className="truncate font-mono text-slate-700">/t/{tenantSlug}</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void copyLink(`/t/${tenantSlug}`, 'Lien donateurs')}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copier
+                  </button>
+                  <a
+                    href={`/t/${tenantSlug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Ouvrir
+                  </a>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Formulaire d’inscription des Bénévoles
-                </p>
-                <p className="text-xs text-slate-500">
-                  Permet aux parents et volontaires de s’inscrire pour la collecte.
-                </p>
+            <div className="rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Formulaire d’inscription des Bénévoles
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Permet aux parents et volontaires de s’inscrire pour la collecte.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void onUpdateCampaign({ isVolunteerFormOpen: !campaign.isVolunteerFormOpen })
+                  }
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                    campaign.isVolunteerFormOpen
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {campaign.isVolunteerFormOpen ? (
+                    <>
+                      <ToggleRight className="h-5 w-5 text-emerald-600" />
+                      Ouvert
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="h-5 w-5 text-slate-500" />
+                      Fermé
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  void onUpdateCampaign({ isVolunteerFormOpen: !campaign.isVolunteerFormOpen })
-                }
-                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                  campaign.isVolunteerFormOpen
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-slate-200 text-slate-700'
-                }`}
-              >
-                {campaign.isVolunteerFormOpen ? (
-                  <>
-                    <ToggleRight className="h-5 w-5 text-emerald-600" />
-                    Ouvert
-                  </>
-                ) : (
-                  <>
-                    <ToggleLeft className="h-5 w-5 text-slate-500" />
-                    Fermé
-                  </>
-                )}
-              </button>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                <span className="truncate font-mono text-slate-700">/t/{tenantSlug}/benevole</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void copyLink(`/t/${tenantSlug}/benevole`, 'Lien bénévoles')}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copier
+                  </button>
+                  <a
+                    href={`/t/${tenantSlug}/benevole`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-medium text-slate-700 hover:bg-slate-100"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Ouvrir
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
