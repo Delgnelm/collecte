@@ -55,6 +55,15 @@ export function PublicPortalPage({ mode }: PublicPortalPageProps) {
     void fetchCampaign();
   }, [fetchCampaign]);
 
+  useEffect(() => {
+    if (data) {
+      document.title = `${data.campaign.name} — ${data.tenant.name}`;
+    }
+    return () => {
+      document.title = 'Collecte École — Porte-à-Porte';
+    };
+  }, [data]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">

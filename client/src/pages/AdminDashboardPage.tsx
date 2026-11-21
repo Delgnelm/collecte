@@ -2,14 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2,
+  Check,
   ExternalLink,
   KeyRound,
   Loader2,
   LogOut,
   Map,
   MapPin,
+  Pencil,
   Settings,
   Users,
+  X,
 } from 'lucide-react';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { CampaignSettingsTab } from '../components/admin/CampaignSettingsTab';
@@ -49,6 +52,9 @@ export function AdminDashboardPage() {
   const [initialTabSet, setInitialTabSet] = useState(false);
   const [lastDispatch, setLastDispatch] = useState<EmailDispatchResult | null>(null);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [editingCampaignName, setEditingCampaignName] = useState(false);
+  const [campaignNameDraft, setCampaignNameDraft] = useState('');
+  const [savingCampaignName, setSavingCampaignName] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const notify = useCallback((type: ToastMessage['type'], text: string) => {
@@ -129,9 +135,19 @@ export function AdminDashboardPage() {
     setInitialTabSet(false);
   };
 
+  useEffect(() => {
+    if (data) {
+      document.title = `${data.campaign.name} — Admin`;
+    }
+    return () => {
+      document.title = 'Collecte École — Porte-à-Porte';
+    };
+  }, [data]);
+
   const handleSwitchTenant = async (tenantId: string, goToMap = false) => {
     setSelectedTenantId(tenantId);
     setLastDispatch(null);
+    setEditingCampaignName(false);
     if (goToMap) {
       setActiveTab('map');
     }
@@ -331,6 +347,25 @@ export function AdminDashboardPage() {
     }
   };
 
+  const handleSaveCampaignName = async () => {
+    const trimmed = campaignNameDraft.trim();
+    if (trimmed.length < 2) {
+      notify('error', 'Le nom de la collecte doit contenir au moins 2 caractères.');
+      return;
+    }
+    if (trimmed === data.campaign.name) {
+      setEditingCampaignName(false);
+      return;
+    }
+    setSavingCampaignName(true);
+    try {
+      await handleUpdateCampaign({ name: trimmed });
+      setEditingCampaignName(false);
+    } finally {
+      setSavingCampaignName(false);
+    }
+  };
+
   const isSuperAdmin = authUser.role === 'SUPERADMIN';
   const tabs: Array<{ id: AdminTab; label: string; icon: typeof Map; badge?: number }> = [
     ...(isSuperAdmin
@@ -372,9 +407,66 @@ export function AdminDashboardPage() {
                 {data.tenant.name}
               </span>
             </div>
-            <h1 className="text-lg font-extrabold text-slate-900 sm:text-xl">
-              {data.campaign.name}
-            </h1>
+            {editingCampaignName ? (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  autoFocus
+                  minLength={2}
+                  maxLength={140}
+                  value={campaignNameDraft}
+                  onChange={(e) => setCampaignNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleSaveCampaignName();
+                    } else if (e.key === 'Escape') {
+                      setEditingCampaignName(false);
+                    }
+                  }}
+                  className="min-w-[260px] rounded-xl border border-blue-400 bg-white px-3 py-1.5 text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                <button
+                  type="button"
+                  disabled={savingCampaignName}
+                  onClick={() => void handleSaveCampaignName()}
+                  className="inline-flex items-center gap-1 rounded-xl bg-blue-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 disabled:bg-slate-400"
+                >
+                  {savingCampaignName ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                  Enregistrer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCampaignName(false)}
+                  className="inline-flex items-center rounded-xl border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
+                  title="Annuler"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="mt-0.5 flex items-center gap-2">
+                <h1 className="text-lg font-extrabold text-slate-900 sm:text-xl">
+                  {data.campaign.name}
+                </h1>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCampaignNameDraft(data.campaign.name);
+                    setEditingCampaignName(true);
+                  }}
+                  className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-blue-800"
+                  title="Renommer la collecte"
+                  aria-label="Renommer la collecte"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

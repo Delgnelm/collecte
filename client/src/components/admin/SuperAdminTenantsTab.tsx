@@ -43,6 +43,7 @@ export function SuperAdminTenantsTab({
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
+  const [campaignName, setCampaignName] = useState('');
   const [city, setCity] = useState('');
   const [centerLat, setCenterLat] = useState<number | undefined>(undefined);
   const [centerLng, setCenterLng] = useState<number | undefined>(undefined);
@@ -73,6 +74,7 @@ export function SuperAdminTenantsTab({
       await api.createTenant({
         name: name.trim(),
         slug: slug.trim(),
+        campaignName: campaignName.trim() || undefined,
         city: city.trim() || undefined,
         centerLat,
         centerLng,
@@ -83,6 +85,7 @@ export function SuperAdminTenantsTab({
       setName('');
       setSlug('');
       setSlugEdited(false);
+      setCampaignName('');
       setCity('');
       setCenterLat(undefined);
       setCenterLng(undefined);
@@ -208,10 +211,10 @@ export function SuperAdminTenantsTab({
           </h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-700">
-              Nom du tenant *
+              Nom du tenant (école / organisme) *
             </label>
             <input
               type="text"
@@ -240,6 +243,21 @@ export function SuperAdminTenantsTab({
               }}
               placeholder="ecole-des-erables"
               className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              Nom de la collecte (optionnel)
+            </label>
+            <input
+              type="text"
+              minLength={campaignName.trim() ? 2 : undefined}
+              maxLength={140}
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="Ex : Collecte de bouteilles consignées 2026"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
 
@@ -348,6 +366,11 @@ export function SuperAdminTenantsTab({
                     )}
                   </div>
                   <p className="mt-1 font-mono text-xs text-slate-500">slug : {tenant.slug}</p>
+                  {tenant.campaign && (
+                    <p className="mt-0.5 text-xs font-medium text-slate-700">
+                      Collecte : {tenant.campaign.name}
+                    </p>
+                  )}
                 </div>
               </div>
 

@@ -130,6 +130,15 @@ export function FieldTeamPage() {
   }, [loadField]);
 
   useEffect(() => {
+    if (data) {
+      document.title = `${data.sector.name} — ${data.campaign.name}`;
+    }
+    return () => {
+      document.title = 'Collecte École — Porte-à-Porte';
+    };
+  }, [data]);
+
+  useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       void syncPending().then(() => loadField());
