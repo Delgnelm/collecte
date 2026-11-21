@@ -29,20 +29,74 @@ export interface GeoJsonPolygon {
   coordinates: number[][][];
 }
 
-function normalizePolygon(raw: z.infer<typeof rawPolygonSchema>): GeoJsonPolygon {
-  const closedRings = raw.coordinates.map((ring) => {
-    const first = ring[0];
-    const last = ring[ring.length - 1];
-    const isClosed = first[0] === last[0] && first[1] === last[1];
-    const closed = isClosed ? ring : [...ring, [first[0], first[1]] as [number, number]];
-    return closed;
-  });
+export interface GeoJsonMultiPolygon {
+  type: 'MultiPolygon';
+  coordinates: number[][][][];
+}
 
+export type GeoJsonBoundary = GeoJsonPolygon | GeoJsonMultiPolygon;
+
+function closeRing(ring: Array<[number, number]>): number[][] {
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  const isClosed = first[0] === last[0] && first[1] === last[1];
+  return isClosed ? ring : [...ring, [first[0], first[1]]];
+}
+
+function normalizePolygon(raw: z.infer<typeof rawPolygonSchema>): GeoJsonPolygon {
   return {
     type: 'Polygon',
-    coordinates: closedRings,
+    coordinates: raw.coordinates.map(closeRing),
   };
 }
+
+const rawBoundaryPolygonSchema = z.object({
+  type: z.literal('Polygon'),
+  coordinates: z.array(z.array(coordinateSchema).min(3).max(5000)).min(1),
+});
+
+const rawBoundaryMultiPolygonSchema = z.object({
+  type: z.literal('MultiPolygon'),
+  coordinates: z.array(z.array(z.array(coordinateSchema).min(3).max(5000)).min(1)).min(1),
+});
+
+const rawBoundaryGeometrySchema = z.union([rawBoundaryPolygonSchema, rawBoundaryMultiPolygonSchema]);
+
+const rawFeatureBoundarySchema = z.object({
+  type: z.literal('Feature'),
+  geometry: rawBoundaryGeometrySchema,
+  properties: z.record(z.unknown()).optional().nullable(),
+});
+
+function countBoundaryVertices(boundary: GeoJsonBoundary): number {
+  if (boundary.type === 'Polygon') {
+    return boundary.coordinates.reduce((sum, ring) => sum + ring.length, 0);
+  }
+  return boundary.coordinates.reduce(
+    (sum, poly) => sum + poly.reduce((pSum, ring) => pSum + ring.length, 0),
+    0
+  );
+}
+
+export const geoJsonBoundarySchema = z
+  .union([rawBoundaryGeometrySchema, rawFeatureBoundarySchema])
+  .transform((val): GeoJsonBoundary => {
+    const geom = val.type === 'Feature' ? val.geometry : val;
+    if (geom.type === 'Polygon') {
+      return {
+        type: 'Polygon',
+        coordinates: geom.coordinates.map(closeRing),
+      };
+    }
+    return {
+      type: 'MultiPolygon',
+      coordinates: geom.coordinates.map((poly) => poly.map(closeRing)),
+    };
+  })
+  .refine(
+    (boundary) => countBoundaryVertices(boundary) <= 5000,
+    'La zone principale ne peut pas dépasser 5000 sommets'
+  );
 
 export const geoJsonPolygonSchema = z
   .union([rawPolygonSchema, rawFeaturePolygonSchema])
@@ -72,6 +126,7 @@ export const updateCampaignSchema = z.object({
   centerLat: z.number().finite().min(-90).max(90).optional(),
   centerLng: z.number().finite().min(-180).max(180).optional(),
   zoomLevel: z.number().int().min(3).max(19).optional(),
+  boundaryGeoJson: geoJsonBoundarySchema.nullable().optional(),
   isDonorFormOpen: z.boolean().optional(),
   isVolunteerFormOpen: z.boolean().optional(),
 });
@@ -80,12 +135,14 @@ export const createSectorSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   color: hexColorSchema.optional(),
   geoJsonPolygon: geoJsonPolygonSchema,
+  clipToBoundary: z.boolean().optional(),
 });
 
 export const updateSectorSchema = z.object({
   name: z.string().trim().min(1, 'Nom requis').max(80).optional(),
   color: hexColorSchema.optional(),
   geoJsonPolygon: geoJsonPolygonSchema.optional(),
+  clipToBoundary: z.boolean().optional(),
 });
 
 export const createDonationPointSchema = z.object({

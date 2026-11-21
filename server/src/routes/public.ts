@@ -4,7 +4,11 @@ import { prisma } from '../lib/prisma.js';
 import { publicSubmissionLimiter } from '../middleware/rateLimiter.js';
 import { validateBody } from '../middleware/validate.js';
 import { createDonationPointSchema, createVolunteerSchema } from '../schemas/validation.js';
-import { findMatchingSectorId } from '../services/geoService.js';
+import {
+  findMatchingSectorId,
+  isPointInBoundary,
+  parseGeoJsonBoundary,
+} from '../services/geoService.js';
 
 export const publicRouter = Router();
 
@@ -46,6 +50,7 @@ async function handleGetCampaign(req: Request, res: Response, next: NextFunction
         centerLat: campaign.centerLat,
         centerLng: campaign.centerLng,
         zoomLevel: campaign.zoomLevel,
+        hasBoundary: Boolean(campaign.boundaryGeoJson),
         isDonorFormOpen: campaign.isDonorFormOpen,
         isVolunteerFormOpen: campaign.isVolunteerFormOpen,
       },
@@ -85,6 +90,8 @@ async function handleCreateDonationPoint(req: Request, res: Response, next: Next
 
     const matchedSectorId = findMatchingSectorId(lat, lng, sectors);
     const matchedSector = sectors.find((s) => s.id === matchedSectorId) ?? null;
+    const boundary = parseGeoJsonBoundary(campaign.boundaryGeoJson);
+    const inBoundary = boundary ? isPointInBoundary(lat, lng, boundary) : true;
 
     const created = await prisma.donationPoint.create({
       data: {
@@ -111,10 +118,13 @@ async function handleCreateDonationPoint(req: Request, res: Response, next: Next
     res.status(201).json({
       point: created,
       inSector: Boolean(matchedSectorId),
+      inBoundary,
       sectorName: matchedSector?.name ?? null,
       message: matchedSector
         ? `Merci ! Votre adresse a été assignée au secteur "${matchedSector.name}".`
-        : 'Merci ! Votre adresse a été enregistrée (hors secteur actuel : l’équipe organisatrice ajustera la zone prochainement).',
+        : inBoundary
+          ? 'Merci ! Votre adresse a été enregistrée (hors secteur actuel : l’équipe organisatrice ajustera la zone prochainement).'
+          : 'Merci ! Votre adresse a été enregistrée (en dehors de la zone principale actuelle ; l’équipe organisatrice vérifiera la couverture).',
     });
   } catch (error) {
     next(error);

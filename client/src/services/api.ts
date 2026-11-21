@@ -3,6 +3,7 @@ import type {
   AdminMeResponse,
   AuthUser,
   Campaign,
+  CityBoundaryResponse,
   DonationPoint,
   DonationStatus,
   EmailDispatchResult,
@@ -145,6 +146,7 @@ export const api = {
     return request<{
       point: DonationPoint;
       inSector: boolean;
+      inBoundary?: boolean;
       sectorName: string | null;
       message: string;
     }>(path, {
@@ -191,6 +193,15 @@ export const api = {
     return request<{ provider: string; suggestions: GeocodingSuggestion[] }>(
       `/api/geocode/cities?${params.toString()}`
     );
+  },
+
+  fetchCityBoundary(q: string, bias?: { lat: number; lng: number }) {
+    const params = new URLSearchParams({ q });
+    if (bias) {
+      params.set('lat', String(bias.lat));
+      params.set('lng', String(bias.lng));
+    }
+    return request<CityBoundaryResponse>(`/api/geocode/boundary?${params.toString()}`);
   },
 
   // Field
@@ -326,26 +337,40 @@ export const api = {
     });
   },
 
-  createSector(data: { name?: string; color?: string; geoJsonPolygon: GeoJsonPolygon }) {
-    return request<{ sector: Sector; recalculation: RecalculationSummary }>('/api/admin/sectors', {
-      method: 'POST',
-      auth: true,
-      body: JSON.stringify(data),
-    });
-  },
-
-  updateSector(
-    sectorId: string,
-    data: { name?: string; color?: string; geoJsonPolygon?: GeoJsonPolygon }
-  ) {
-    return request<{ sector: Sector; recalculation: RecalculationSummary | null }>(
-      `/api/admin/sectors/${encodeURIComponent(sectorId)}`,
+  createSector(data: {
+    name?: string;
+    color?: string;
+    geoJsonPolygon: GeoJsonPolygon;
+    clipToBoundary?: boolean;
+  }) {
+    return request<{ sector: Sector; recalculation: RecalculationSummary; clipped?: boolean }>(
+      '/api/admin/sectors',
       {
-        method: 'PATCH',
+        method: 'POST',
         auth: true,
         body: JSON.stringify(data),
       }
     );
+  },
+
+  updateSector(
+    sectorId: string,
+    data: {
+      name?: string;
+      color?: string;
+      geoJsonPolygon?: GeoJsonPolygon;
+      clipToBoundary?: boolean;
+    }
+  ) {
+    return request<{
+      sector: Sector;
+      recalculation: RecalculationSummary | null;
+      clipped?: boolean;
+    }>(`/api/admin/sectors/${encodeURIComponent(sectorId)}`, {
+      method: 'PATCH',
+      auth: true,
+      body: JSON.stringify(data),
+    });
   },
 
   deleteSector(sectorId: string) {

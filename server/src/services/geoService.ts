@@ -1,6 +1,14 @@
-import { booleanPointInPolygon, point, polygon as turfPolygon } from '@turf/turf';
+import {
+  area,
+  booleanPointInPolygon,
+  featureCollection,
+  intersect,
+  multiPolygon as turfMultiPolygon,
+  point,
+  polygon as turfPolygon,
+} from '@turf/turf';
 import { prisma } from '../lib/prisma.js';
-import type { GeoJsonPolygon } from '../schemas/validation.js';
+import type { GeoJsonBoundary, GeoJsonPolygon } from '../schemas/validation.js';
 import { env } from '../config/env.js';
 
 function isSqliteDatabase(): boolean {
@@ -30,6 +38,109 @@ export function parseGeoJsonPolygon(raw: unknown): GeoJsonPolygon {
 
 export function serializePolygonForDb(geo: GeoJsonPolygon): string | GeoJsonPolygon {
   return isSqliteDatabase() ? JSON.stringify(geo) : geo;
+}
+
+export function parseGeoJsonBoundary(raw: unknown): GeoJsonBoundary | null {
+  if (raw === null || raw === undefined || raw === '') {
+    return null;
+  }
+
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    const obj = parsed as
+      | GeoJsonBoundary
+      | { type: 'Feature'; geometry?: GeoJsonBoundary };
+    const geom = obj.type === 'Feature' && 'geometry' in obj ? obj.geometry : obj;
+    if (geom && (geom.type === 'Polygon' || geom.type === 'MultiPolygon')) {
+      return geom;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function serializeBoundaryForDb(
+  boundary: GeoJsonBoundary | null
+): string | GeoJsonBoundary | null {
+  if (boundary === null) {
+    return null;
+  }
+  return isSqliteDatabase() ? JSON.stringify(boundary) : boundary;
+}
+
+export function isPointInBoundary(
+  lat: number,
+  lng: number,
+  boundary: GeoJsonBoundary
+): boolean {
+  try {
+    const pt = point([lng, lat]);
+    if (boundary.type === 'Polygon') {
+      return booleanPointInPolygon(pt, turfPolygon(boundary.coordinates));
+    }
+    return booleanPointInPolygon(pt, turfMultiPolygon(boundary.coordinates));
+  } catch {
+    return false;
+  }
+}
+
+function pickLargestPolygon(candidates: number[][][][]): GeoJsonPolygon | null {
+  let bestCoords: number[][][] | null = null;
+  let bestArea = -1;
+  for (const polyCoords of candidates) {
+    const polyArea = area(turfPolygon(polyCoords));
+    if (polyArea > bestArea) {
+      bestArea = polyArea;
+      bestCoords = polyCoords;
+    }
+  }
+  if (!bestCoords || bestArea <= 0) {
+    return null;
+  }
+  return {
+    type: 'Polygon',
+    coordinates: bestCoords,
+  };
+}
+
+export function clipSectorToBoundary(
+  sectorPoly: GeoJsonPolygon,
+  boundary: GeoJsonBoundary
+): GeoJsonPolygon | null {
+  try {
+    const sectorFeature = turfPolygon(sectorPoly.coordinates);
+    const boundaryPolygons =
+      boundary.type === 'Polygon' ? [boundary.coordinates] : boundary.coordinates;
+
+    const intersectedParts: number[][][][] = [];
+
+    for (const partCoords of boundaryPolygons) {
+      const clipped = intersect(featureCollection([sectorFeature, turfPolygon(partCoords)]));
+      if (!clipped || !clipped.geometry) continue;
+      if (clipped.geometry.type === 'Polygon') {
+        intersectedParts.push(clipped.geometry.coordinates);
+      } else if (clipped.geometry.type === 'MultiPolygon') {
+        intersectedParts.push(...clipped.geometry.coordinates);
+      }
+    }
+
+    if (intersectedParts.length === 0) {
+      return null;
+    }
+    if (intersectedParts.length === 1) {
+      return {
+        type: 'Polygon',
+        coordinates: intersectedParts[0],
+      };
+    }
+    return pickLargestPolygon(intersectedParts);
+  } catch {
+    return null;
+  }
 }
 
 export function isPointInSector(lat: number, lng: number, geo: GeoJsonPolygon): boolean {

@@ -329,6 +329,161 @@ describe('API Collecte École Multi-Tenant — Intégration complète', () => {
     assert.equal(reopenForms.status, 200);
   });
 
+  it('gère la Zone Principale (Polygon/MultiPolygon), le rognage Turf.js et le drapeau inBoundary', async () => {
+    // 1. Définir une Zone Principale MultiPolygon couvrant [-73.58, 45.49] à [-73.55, 45.52]
+    const setMultiBoundary = await requestJson<{
+      campaign: { boundaryGeoJson: { type: string } | null };
+    }>('/api/admin/campaign', {
+      method: 'PATCH',
+      token: superAdminToken,
+      body: {
+        boundaryGeoJson: {
+          type: 'MultiPolygon',
+          coordinates: [
+            [
+              [
+                [-73.58, 45.49],
+                [-73.55, 45.49],
+                [-73.55, 45.52],
+                [-73.58, 45.52],
+                [-73.58, 45.49],
+              ],
+            ],
+          ],
+        },
+      },
+    });
+    assert.equal(setMultiBoundary.status, 200);
+    assert.equal(setMultiBoundary.data.campaign.boundaryGeoJson?.type, 'MultiPolygon');
+
+    // 2. Remplacer par une Zone Principale Polygon [-73.575, 45.495] à [-73.555, 45.515]
+    const setPolyBoundary = await requestJson<{
+      campaign: { boundaryGeoJson: { type: string } | null };
+    }>('/api/admin/campaign', {
+      method: 'PATCH',
+      token: superAdminToken,
+      body: {
+        boundaryGeoJson: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [-73.575, 45.495],
+              [-73.555, 45.495],
+              [-73.555, 45.515],
+              [-73.575, 45.515],
+              [-73.575, 45.495],
+            ],
+          ],
+        },
+      },
+    });
+    assert.equal(setPolyBoundary.status, 200);
+    assert.equal(setPolyBoundary.data.campaign.boundaryGeoJson?.type, 'Polygon');
+
+    // 3. Tracer un secteur qui déborde à l'est (-73.54) avec clipToBoundary: true -> doit rogner à -73.555
+    const clippedSectorRes = await requestJson<{
+      sector: { id: string; geoJsonPolygon: { coordinates: number[][][] } };
+      clipped: boolean;
+    }>('/api/admin/sectors', {
+      method: 'POST',
+      token: superAdminToken,
+      body: {
+        name: 'Secteur Rogné',
+        clipToBoundary: true,
+        geoJsonPolygon: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [-73.565, 45.5],
+              [-73.54, 45.5],
+              [-73.54, 45.51],
+              [-73.565, 45.51],
+              [-73.565, 45.5],
+            ],
+          ],
+        },
+      },
+    });
+    assert.equal(clippedSectorRes.status, 201);
+    assert.equal(clippedSectorRes.data.clipped, true);
+    const maxLng = Math.max(
+      ...clippedSectorRes.data.sector.geoJsonPolygon.coordinates[0].map((c) => c[0])
+    );
+    assert.ok(maxLng <= -73.5549, `Expected clipped maxLng <= -73.555, got ${maxLng}`);
+
+    // 4. Tracer un secteur entièrement hors de la Zone Principale avec clipToBoundary: true -> 400
+    const outsideClipRes = await requestJson('/api/admin/sectors', {
+      method: 'POST',
+      token: superAdminToken,
+      body: {
+        name: 'Secteur Hors Limite',
+        clipToBoundary: true,
+        geoJsonPolygon: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [-73.52, 45.5],
+              [-73.5, 45.5],
+              [-73.5, 45.51],
+              [-73.52, 45.51],
+              [-73.52, 45.5],
+            ],
+          ],
+        },
+      },
+    });
+    assert.equal(outsideClipRes.status, 400);
+
+    // 5. Tester le drapeau inBoundary sur les points de donateurs
+    const inPoint = await requestJson<{
+      point: { id: string };
+      inBoundary: boolean;
+      inSector: boolean;
+    }>('/api/public/donation-points', {
+      method: 'POST',
+      body: { address: '1 Rue Dans Zone, Montréal, QC', lat: 45.505, lng: -73.56 },
+    });
+    assert.equal(inPoint.status, 201);
+    assert.equal(inPoint.data.inBoundary, true);
+    assert.equal(inPoint.data.inSector, true);
+
+    const outPoint = await requestJson<{
+      point: { id: string };
+      inBoundary: boolean;
+      inSector: boolean;
+    }>('/api/public/donation-points', {
+      method: 'POST',
+      body: { address: '2 Rue Hors Zone, Montréal, QC', lat: 45.505, lng: -73.545 },
+    });
+    assert.equal(outPoint.status, 201);
+    assert.equal(outPoint.data.inBoundary, false);
+    assert.equal(outPoint.data.inSector, false);
+
+    // 6. Effacer la Zone Principale et nettoyer les données temporaires de ce test
+    const clearBoundary = await requestJson<{
+      campaign: { boundaryGeoJson: unknown };
+    }>('/api/admin/campaign', {
+      method: 'PATCH',
+      token: superAdminToken,
+      body: { boundaryGeoJson: null },
+    });
+    assert.equal(clearBoundary.status, 200);
+    assert.equal(clearBoundary.data.campaign.boundaryGeoJson, null);
+
+    await requestJson(`/api/admin/sectors/${clippedSectorRes.data.sector.id}`, {
+      method: 'DELETE',
+      token: superAdminToken,
+    });
+    await requestJson(`/api/admin/donation-points/${inPoint.data.point.id}`, {
+      method: 'DELETE',
+      token: superAdminToken,
+    });
+    await requestJson(`/api/admin/donation-points/${outPoint.data.point.id}`, {
+      method: 'DELETE',
+      token: superAdminToken,
+    });
+  });
+
   it('gère les polygones de secteur, la détection Turf.js, le recalcul lors de l’édition et la suppression', async () => {
     const createNorth = await requestJson<{
       sector: { id: string; name: string; accessToken: string };

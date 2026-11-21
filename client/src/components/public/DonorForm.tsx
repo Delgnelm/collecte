@@ -23,6 +23,7 @@ export function DonorForm({ bias, tenantSlug, onSuccess }: DonorFormProps) {
   const [confirmation, setConfirmation] = useState<{
     message: string;
     inSector: boolean;
+    inBoundary: boolean;
     address: string;
   } | null>(null);
 
@@ -62,6 +63,7 @@ export function DonorForm({ bias, tenantSlug, onSuccess }: DonorFormProps) {
       setConfirmation({
         message: res.message,
         inSector: res.inSector,
+        inBoundary: res.inBoundary ?? true,
         address: selectedAddress,
       });
       setSelectedAddress('');
@@ -88,7 +90,13 @@ export function DonorForm({ bias, tenantSlug, onSuccess }: DonorFormProps) {
         <p className="mt-2 text-xs font-medium text-slate-500">{confirmation.address}</p>
         {!confirmation.inSector && (
           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            Statut : <strong>Hors secteur actuel</strong>. Aucune inquiétude, votre adresse est bien visible par l’école pour ajuster les zones.
+            Statut :{' '}
+            <strong>
+              {confirmation.inBoundary
+                ? 'Hors secteur actuel'
+                : 'En dehors de la zone principale actuelle'}
+            </strong>
+            . Aucune inquiétude, votre adresse est bien visible par l’école pour vérifier ou ajuster la couverture.
           </div>
         )}
         <button

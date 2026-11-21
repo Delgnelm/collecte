@@ -6,6 +6,26 @@ export interface GeoJsonPolygon {
   coordinates: number[][][];
 }
 
+export interface GeoJsonMultiPolygon {
+  type: 'MultiPolygon';
+  coordinates: number[][][][];
+}
+
+export type GeoJsonBoundary = GeoJsonPolygon | GeoJsonMultiPolygon;
+
+export type CityBoundaryResponse =
+  | {
+      found: true;
+      displayName: string;
+      geoJson: GeoJsonBoundary;
+      centerLat: number;
+      centerLng: number;
+      bbox: [number, number, number, number];
+    }
+  | {
+      found: false;
+    };
+
 export interface GeocodingSuggestion {
   id: string;
   label: string;
@@ -79,6 +99,8 @@ export interface Campaign {
   centerLat: number;
   centerLng: number;
   zoomLevel: number;
+  boundaryGeoJson?: GeoJsonBoundary | null;
+  hasBoundary?: boolean;
   isDonorFormOpen: boolean;
   isVolunteerFormOpen: boolean;
   lastPurgedAt: string | null;

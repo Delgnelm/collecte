@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import {
   AlertTriangle,
+  CheckCircle2,
   Copy,
   ExternalLink,
+  Loader2,
   Mail,
+  MapPin,
+  Pencil,
   RefreshCw,
   RotateCcw,
+  Scissors,
   Trash2,
+  X,
 } from 'lucide-react';
+import { api } from '../../services/api';
 import type {
   Campaign,
   DonationPoint,
@@ -46,10 +53,15 @@ interface SectorMapTabProps {
   sectors: Sector[];
   donationPoints: DonationPoint[];
   onUpdateCampaign: (patch: Partial<Campaign>) => Promise<void>;
-  onCreateSector: (geo: GeoJsonPolygon) => Promise<void>;
+  onCreateSector: (geo: GeoJsonPolygon, clipToBoundary: boolean) => Promise<void>;
   onUpdateSector: (
     sectorId: string,
-    patch: { name?: string; color?: string; geoJsonPolygon?: GeoJsonPolygon }
+    patch: {
+      name?: string;
+      color?: string;
+      geoJsonPolygon?: GeoJsonPolygon;
+      clipToBoundary?: boolean;
+    }
   ) => Promise<void>;
   onDeleteSector: (sectorId: string) => Promise<void>;
   onRotateToken: (sectorId: string) => Promise<void>;
@@ -74,8 +86,51 @@ export function SectorMapTab({
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [onlyOutOfSector, setOnlyOutOfSector] = useState(false);
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
+  const [drawMode, setDrawMode] = useState<'sector' | 'boundary'>('sector');
+  const [clipToBoundary, setClipToBoundary] = useState(true);
+  const [importingBoundary, setImportingBoundary] = useState(false);
 
   const outOfSectorCount = donationPoints.filter((pt) => !pt.sectorId).length;
+  const hasBoundary = Boolean(campaign.boundaryGeoJson);
+
+  const importBoundaryForCity = async (
+    query: string,
+    bias?: { lat: number; lng: number },
+    silentFallback = false
+  ) => {
+    setImportingBoundary(true);
+    try {
+      const boundaryRes = await api.fetchCityBoundary(query, bias);
+      if (boundaryRes.found) {
+        await onUpdateCampaign({
+          boundaryGeoJson: boundaryRes.geoJson,
+          centerLat: boundaryRes.centerLat,
+          centerLng: boundaryRes.centerLng,
+        });
+        onNotify(
+          'success',
+          `Zone principale importée pour « ${query} ». Vous pouvez maintenant découper vos secteurs à l’intérieur.`
+        );
+      } else if (!silentFallback) {
+        onNotify(
+          'info',
+          `Aucune frontière administrative trouvée pour « ${query} ». Vous pouvez tracer la zone principale manuellement.`
+        );
+      } else {
+        onNotify(
+          'info',
+          'Carte centrée sur la ville. Aucune limite officielle trouvée : vous pouvez tracer la zone principale manuellement.'
+        );
+      }
+    } catch (err) {
+      onNotify(
+        'error',
+        err instanceof Error ? err.message : 'Erreur lors de l’importation des limites.'
+      );
+    } finally {
+      setImportingBoundary(false);
+    }
+  };
 
   const handleCitySelect = async (suggestion: GeocodingSuggestion) => {
     const zoomLevel = estimateZoomFromExtent(suggestion.extent);
@@ -85,6 +140,23 @@ export function SectorMapTab({
       centerLng: suggestion.lng,
       zoomLevel,
     });
+    await importBoundaryForCity(
+      suggestion.label,
+      { lat: suggestion.lat, lng: suggestion.lng },
+      true
+    );
+  };
+
+  const handleSetBoundary = async (geo: GeoJsonPolygon) => {
+    setDrawMode('sector');
+    await onUpdateCampaign({ boundaryGeoJson: geo });
+    onNotify('success', 'Zone principale enregistrée.');
+  };
+
+  const handleClearBoundary = async () => {
+    setDrawMode('sector');
+    await onUpdateCampaign({ boundaryGeoJson: null });
+    onNotify('info', 'Zone principale effacée.');
   };
 
   const handleCopyLink = async (sector: Sector) => {
@@ -139,15 +211,100 @@ export function SectorMapTab({
           </div>
         </div>
 
-        <div className="max-w-xl">
-          <AddressAutocomplete
-            mode="city"
-            label="Ville / secteur de travail (centre la carte automatiquement)"
-            placeholder="Ex : Sept-Îles, Sherbrooke, Québec, Laval..."
-            selectedLabel={campaign.city}
-            onSelect={(s) => void handleCitySelect(s)}
-          />
+        <div className="grid gap-4 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-5">
+            <AddressAutocomplete
+              mode="city"
+              label="Ville / secteur de travail (centre la carte et importe les limites)"
+              placeholder="Ex : Sept-Îles, Sherbrooke, Québec, Laval..."
+              selectedLabel={campaign.city}
+              onSelect={(s) => void handleCitySelect(s)}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:col-span-7">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                hasBoundary
+                  ? 'bg-slate-900 text-white'
+                  : 'border border-slate-300 bg-slate-50 text-slate-600'
+              }`}
+            >
+              {hasBoundary ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                  Zone principale définie
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                  Aucune zone principale
+                </>
+              )}
+            </span>
+
+            <button
+              type="button"
+              disabled={importingBoundary || !campaign.city}
+              onClick={() =>
+                void importBoundaryForCity(campaign.city, {
+                  lat: campaign.centerLat,
+                  lng: campaign.centerLng,
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+            >
+              {importingBoundary ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <MapPin className="h-3.5 w-3.5" />
+              )}
+              Importer les limites de la ville
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setDrawMode((prev) => (prev === 'boundary' ? 'sector' : 'boundary'))
+              }
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                drawMode === 'boundary'
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {drawMode === 'boundary' ? 'Annuler le tracé' : 'Tracer manuellement'}
+            </button>
+
+            {hasBoundary && (
+              <button
+                type="button"
+                onClick={() => void handleClearBoundary()}
+                className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-2.5 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                title="Effacer la zone principale"
+              >
+                <X className="h-3.5 w-3.5" />
+                Effacer
+              </button>
+            )}
+          </div>
         </div>
+
+        {hasBoundary && (
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 ring-1 ring-slate-200">
+            <input
+              type="checkbox"
+              checked={clipToBoundary}
+              onChange={(e) => setClipToBoundary(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-900 focus:ring-blue-500"
+            />
+            <Scissors className="h-3.5 w-3.5 text-blue-700" />
+            <span>
+              Rogner automatiquement les secteurs d’équipes sur la frontière de la zone principale
+            </span>
+          </label>
+        )}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-12">
@@ -156,14 +313,23 @@ export function SectorMapTab({
             centerLat={campaign.centerLat}
             centerLng={campaign.centerLng}
             zoomLevel={campaign.zoomLevel}
+            boundaryGeoJson={campaign.boundaryGeoJson ?? null}
+            drawMode={drawMode}
             sectors={sectors}
             donationPoints={donationPoints}
             selectedSectorId={selectedSectorId}
             highlightOutOfSector={onlyOutOfSector}
             onSelectSector={setSelectedSectorId}
-            onCreatePolygon={(geo) => onCreateSector(geo)}
-            onUpdatePolygon={(id, geo) => onUpdateSector(id, { geoJsonPolygon: geo })}
+            onCreatePolygon={(geo) => onCreateSector(geo, hasBoundary && clipToBoundary)}
+            onUpdatePolygon={(id, geo) =>
+              onUpdateSector(id, {
+                geoJsonPolygon: geo,
+                clipToBoundary: hasBoundary && clipToBoundary,
+              })
+            }
             onDeleteSector={(id) => onDeleteSector(id)}
+            onSetBoundary={handleSetBoundary}
+            onCancelBoundaryDraw={() => setDrawMode('sector')}
           />
         </div>
 

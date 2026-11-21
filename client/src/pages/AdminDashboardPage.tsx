@@ -167,13 +167,17 @@ export function AdminDashboardPage() {
     }
   };
 
-  const handleCreateSector = async (geoJsonPolygon: GeoJsonPolygon) => {
+  const handleCreateSector = async (
+    geoJsonPolygon: GeoJsonPolygon,
+    clipToBoundary = false
+  ) => {
     try {
-      const res = await api.createSector({ geoJsonPolygon });
+      const res = await api.createSector({ geoJsonPolygon, clipToBoundary });
       await loadDashboard();
+      const clipNote = res.clipped ? ' (rogné sur la zone principale)' : '';
       notify(
         'success',
-        `Secteur "${res.sector.name}" créé (${res.recalculation.assignedCount} point(s) assigné(s)).`
+        `Secteur "${res.sector.name}" créé${clipNote} — ${res.recalculation.assignedCount} point(s) assigné(s).`
       );
     } catch (err) {
       notify('error', err instanceof Error ? err.message : 'Impossible de créer le secteur.');
@@ -182,15 +186,21 @@ export function AdminDashboardPage() {
 
   const handleUpdateSector = async (
     sectorId: string,
-    patch: { name?: string; color?: string; geoJsonPolygon?: GeoJsonPolygon }
+    patch: {
+      name?: string;
+      color?: string;
+      geoJsonPolygon?: GeoJsonPolygon;
+      clipToBoundary?: boolean;
+    }
   ) => {
     try {
       const res = await api.updateSector(sectorId, patch);
       await loadDashboard();
       if (res.recalculation) {
+        const clipNote = res.clipped ? ' (rogné sur la zone principale)' : '';
         notify(
           'success',
-          `Secteur mis à jour : ${res.recalculation.updatedCount} point(s) réassigné(s).`
+          `Secteur mis à jour${clipNote} : ${res.recalculation.updatedCount} point(s) réassigné(s).`
         );
       } else {
         notify('success', 'Secteur mis à jour.');

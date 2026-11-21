@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { geocodeLimiter } from '../middleware/rateLimiter.js';
+import { fetchCityBoundary } from '../services/geocoding/boundaryService.js';
 import { searchAddresses, searchCities } from '../services/geocoding/index.js';
 
 export const geocodeRouter = Router();
@@ -41,6 +42,23 @@ geocodeRouter.get('/cities', geocodeLimiter, async (req, res, next) => {
     }
 
     const result = await searchCities(parsed.data.q);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+geocodeRouter.get('/boundary', geocodeLimiter, async (req, res, next) => {
+  try {
+    const parsed = searchQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Paramètre de recherche de limites invalide.' });
+      return;
+    }
+
+    const { q, lat, lng } = parsed.data;
+    const bias = lat !== undefined && lng !== undefined ? { lat, lng } : undefined;
+    const result = await fetchCityBoundary(q, bias);
     res.json(result);
   } catch (error) {
     next(error);

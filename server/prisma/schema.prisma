@@ -43,6 +43,7 @@ model Campaign {
   centerLat           Float
   centerLng           Float
   zoomLevel           Int             @default(13)
+  boundaryGeoJson     String?
   isDonorFormOpen     Boolean         @default(true)
   isVolunteerFormOpen Boolean         @default(true)
   lastPurgedAt        DateTime?

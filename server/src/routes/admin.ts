@@ -24,10 +24,20 @@ import {
 } from '../schemas/validation.js';
 import { sendCampaignEmails, sendSectorEmails } from '../services/emailService.js';
 import {
+  clipSectorToBoundary,
+  parseGeoJsonBoundary,
   parseGeoJsonPolygon,
   recalculateCampaignAssignments,
+  serializeBoundaryForDb,
   serializePolygonForDb,
 } from '../services/geoService.js';
+
+function serializeCampaign<T extends { boundaryGeoJson: unknown }>(campaign: T) {
+  return {
+    ...campaign,
+    boundaryGeoJson: parseGeoJsonBoundary(campaign.boundaryGeoJson),
+  };
+}
 
 export const adminRouter = Router();
 
@@ -284,7 +294,7 @@ adminRouter.get('/campaign', async (req: AuthenticatedRequest, res, next) => {
         slug: tenant.slug,
         isActive: tenant.isActive,
       },
-      campaign,
+      campaign: serializeCampaign(campaign),
       sectors: serializedSectors,
       volunteers: activeVolunteers,
       donationPoints: activePoints,
@@ -306,11 +316,18 @@ adminRouter.patch(
     try {
       const tenant = await resolveActiveTenant(req);
       const campaign = await ensureTenantCampaign(tenant.id);
+
+      const { boundaryGeoJson, ...rest } = req.body;
+      const updateData: Record<string, unknown> = { ...rest };
+      if (boundaryGeoJson !== undefined) {
+        updateData.boundaryGeoJson = serializeBoundaryForDb(boundaryGeoJson);
+      }
+
       const updated = await prisma.campaign.update({
         where: { id: campaign.id },
-        data: req.body,
+        data: updateData,
       });
-      res.json({ campaign: updated });
+      res.json({ campaign: serializeCampaign(updated) });
     } catch (error) {
       next(error);
     }
@@ -330,12 +347,27 @@ adminRouter.post(
       const name = req.body.name || `Secteur ${sectorNumber}`;
       const color = req.body.color || SECTOR_PALETTE[existingCount % SECTOR_PALETTE.length];
 
+      let targetPolygon = req.body.geoJsonPolygon;
+      let clipped = false;
+      const parsedBoundary = parseGeoJsonBoundary(campaign.boundaryGeoJson);
+      if (req.body.clipToBoundary && parsedBoundary) {
+        const result = clipSectorToBoundary(targetPolygon, parsedBoundary);
+        if (!result) {
+          res.status(400).json({
+            error: 'Le secteur tracé se situe entièrement en dehors de la zone principale définie.',
+          });
+          return;
+        }
+        targetPolygon = result;
+        clipped = true;
+      }
+
       const created = await prisma.sector.create({
         data: {
           campaignId: campaign.id,
           name,
           color,
-          geoJsonPolygon: serializePolygonForDb(req.body.geoJsonPolygon) as never,
+          geoJsonPolygon: serializePolygonForDb(targetPolygon) as never,
           accessToken: crypto.randomUUID(),
         },
       });
@@ -348,6 +380,7 @@ adminRouter.post(
           geoJsonPolygon: parseGeoJsonPolygon(created.geoJsonPolygon),
         },
         recalculation,
+        clipped,
       });
     } catch (error) {
       next(error);
@@ -379,8 +412,23 @@ adminRouter.patch(
 
       if (req.body.name !== undefined) updateData.name = req.body.name;
       if (req.body.color !== undefined) updateData.color = req.body.color;
+
+      let clipped = false;
       if (req.body.geoJsonPolygon !== undefined) {
-        updateData.geoJsonPolygon = serializePolygonForDb(req.body.geoJsonPolygon) as never;
+        let targetPolygon = req.body.geoJsonPolygon;
+        const parsedBoundary = parseGeoJsonBoundary(campaign.boundaryGeoJson);
+        if (req.body.clipToBoundary && parsedBoundary) {
+          const result = clipSectorToBoundary(targetPolygon, parsedBoundary);
+          if (!result) {
+            res.status(400).json({
+              error: 'Le secteur tracé se situe entièrement en dehors de la zone principale définie.',
+            });
+            return;
+          }
+          targetPolygon = result;
+          clipped = true;
+        }
+        updateData.geoJsonPolygon = serializePolygonForDb(targetPolygon) as never;
       }
 
       const updated = await prisma.sector.update({
@@ -399,6 +447,7 @@ adminRouter.patch(
           geoJsonPolygon: parseGeoJsonPolygon(updated.geoJsonPolygon),
         },
         recalculation,
+        clipped,
       });
     } catch (error) {
       next(error);
