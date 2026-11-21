@@ -75,7 +75,7 @@ export function PublicPortalPage({ mode }: PublicPortalPageProps) {
     );
   }
 
-  const { tenant, campaign, stats } = data;
+  const { tenant, campaign } = data;
   const isDonorMode = mode === 'donor';
   const isFormOpen = isDonorMode ? campaign.isDonorFormOpen : campaign.isVolunteerFormOpen;
 
@@ -105,21 +105,6 @@ export function PublicPortalPage({ mode }: PublicPortalPageProps) {
             ? 'Indiquez votre adresse ci-dessous afin qu’une équipe vienne récupérer vos dons directement à votre porte.'
             : 'Rejoignez notre équipe de bénévoles sur le terrain ! Vous recevrez votre secteur et votre carte interactive par courriel.'}
         </p>
-
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-white/10 p-3 backdrop-blur">
-            <p className="text-xs text-white/80">
-              {isDonorMode ? 'Adresses inscrites' : 'Bénévoles inscrits'}
-            </p>
-            <p className="mt-0.5 text-xl font-bold">
-              {isDonorMode ? stats.totalPoints : stats.totalVolunteers}
-            </p>
-          </div>
-          <div className="rounded-xl bg-white/10 p-3 backdrop-blur">
-            <p className="text-xs text-white/80">Secteurs actifs</p>
-            <p className="mt-0.5 text-xl font-bold">{stats.totalSectors}</p>
-          </div>
-        </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pb-12">
