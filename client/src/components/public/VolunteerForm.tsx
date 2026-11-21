@@ -36,6 +36,7 @@ export function VolunteerForm({ tenantSlug, onSuccess }: VolunteerFormProps) {
       setEmail('');
       setPhone('');
       setNotes('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l’inscription.');

@@ -24,23 +24,32 @@ export function PublicPortalPage({ mode }: PublicPortalPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchCampaign = useCallback(async () => {
-    if (!slug) {
-      setError('Lien de collecte invalide.');
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await api.getPublicCampaign(slug);
-      setData(res);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible de charger la campagne.');
-    } finally {
-      setLoading(false);
-    }
-  }, [slug]);
+  const fetchCampaign = useCallback(
+    async (silent = false) => {
+      if (!slug) {
+        setError('Lien de collecte invalide.');
+        setLoading(false);
+        return;
+      }
+      if (!silent) {
+        setLoading(true);
+      }
+      try {
+        const res = await api.getPublicCampaign(slug);
+        setData(res);
+        setError(null);
+      } catch (err) {
+        if (!silent) {
+          setError(err instanceof Error ? err.message : 'Impossible de charger la campagne.');
+        }
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [slug]
+  );
 
   useEffect(() => {
     void fetchCampaign();
@@ -134,7 +143,7 @@ export function PublicPortalPage({ mode }: PublicPortalPageProps) {
               <DonorForm
                 bias={{ lat: campaign.centerLat, lng: campaign.centerLng }}
                 tenantSlug={tenant.slug}
-                onSuccess={() => void fetchCampaign()}
+                onSuccess={() => void fetchCampaign(true)}
               />
             </>
           ) : (
@@ -145,7 +154,10 @@ export function PublicPortalPage({ mode }: PublicPortalPageProps) {
                   Devenir bénévole pour la collecte
                 </h2>
               </div>
-              <VolunteerForm tenantSlug={tenant.slug} onSuccess={() => void fetchCampaign()} />
+              <VolunteerForm
+                tenantSlug={tenant.slug}
+                onSuccess={() => void fetchCampaign(true)}
+              />
             </>
           )}
         </div>

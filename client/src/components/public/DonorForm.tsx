@@ -71,6 +71,7 @@ export function DonorForm({ bias, tenantSlug, onSuccess }: DonorFormProps) {
       setDonorName('');
       setPreferredTimeSlot('');
       setInstructions('');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l’enregistrement.');
